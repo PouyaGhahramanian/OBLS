@@ -52,9 +52,9 @@ types_2 = {"Airline": int, "Flight": int, "AirportFrom": int, "AirportTo": int,
 types_3 = {"date": float, "day": int, "period": float, "nswprice":float,
            "nswdemand": float, "vicprice": float, "vicdemand":float, "transfer": float, "class": int}
 
-dataset_1 = stream.iter_csv('../data/cover_types.csv', target_name="Cover_Type", converters = types_1)
-dataset_2 = stream.iter_csv('../data/airlines_numerical.csv', target_name="Delay", converters = types_2)
-dataset_3 = stream.iter_csv('../data/electricity_normalized_numerical.csv', target_name="class", converters = types_3)
+dataset_1 = stream.iter_csv('data/cover_types.csv', target_name="Cover_Type", converters = types_1)
+dataset_2 = stream.iter_csv('data/airlines_numerical.csv', target_name="Delay", converters = types_2)
+dataset_3 = stream.iter_csv('data/electricity_normalized_numerical.csv', target_name="class", converters = types_3)
 
 datasets = [dataset_1, dataset_2, dataset_3]
 dataset_index = int(args["dataset"]) - 1
