@@ -24,13 +24,21 @@ from skmultiflow.trees import HoeffdingTree
 from creme import neighbors
 from creme import naive_bayes
 import numpy as np
+import os
+import psutil
+
+process = psutil.Process(os.getpid())
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-m", "--model", required=True,
     help="BasELinE ModEL [1-8]")
 ap.add_argument("-d", "--dataset", required=True,
     help="BasELinE ModEL [1-3]")
+ap.add_argument("-w", "--window_size", required=True,
+    help="Window Size [1-3]")
 args = vars(ap.parse_args())
+
+window_size = int(args['window_size'])
 
 X_y = datasets.fetch_electricity()
 
@@ -60,29 +68,23 @@ datasets = [dataset_1, dataset_2, dataset_3]
 dataset_index = int(args["dataset"]) - 1
 dataset = datasets[dataset_index]
 
-clf1 = Pipeline([("scale", StandardScaler()), ("learn", OneVsRestClassifier(binary_classifier=LogisticRegression()))])
-clf2 = neighbors.KNeighborsClassifier()
-#clf2 = neighbors.KNeighborsClassifier(n_neighbors=2, window_size=len(X_y), p=1, weighted=True)
-#clf2 = KNN(n_neighbors=8, max_window_size=2000, leaf_size=40)
-#clf2 = (preprocessing.StandardScaler() | neighbors.KNeighborsClassifier())
-clf3 = naive_bayes.GaussianNB()
-#clf3 = GaussianNB()
-#clf3_1 = MultinomialNB()
-clf4 = MLPClassifier(alpha=1, max_iter=1000, warm_start = False)
+clf1 = MLPClassifier(alpha=1, max_iter=1000, hidden_layer_sizes=(100, 50, ), warm_start = False, activation="relu")
+clf2 = MLPClassifier(alpha=1, max_iter=1000, hidden_layer_sizes=(100, 50, 50, 25), warm_start = False, activation="relu")
+clf3 = KNN(n_neighbors=8, max_window_size=2000, leaf_size=40)
+clf4 = GaussianNB()
 clf5 = SGDClassifier(alpha=0.0001, average=False, class_weight=None,
        early_stopping=False, epsilon=0.1, eta0=0.0, fit_intercept=True,
        l1_ratio=0.15, learning_rate='optimal', loss='hinge', max_iter=1000,
        n_iter_no_change=5, n_jobs=None, penalty='l2', power_t=0.5,
        random_state=None, shuffle=True, tol=0.001, validation_fraction=0.1,
        verbose=0, warm_start=False)
-#clf6 = SGDClassifier(loss=”perceptron”, eta0=1, learning_rate=”constant”, penalty=None)
-clf6 = Perceptron(penalty=None, alpha=0.0001, fit_intercept=True, shuffle=False, verbose=0, eta0=1.0, n_jobs=1, random_state=0, class_weight=None, warm_start=False)
-clf7 = PassiveAggressiveClassifier(C=1.0, fit_intercept=True, shuffle=False, verbose=0,
-                                    loss='hinge', n_jobs=1, random_state=None, warm_start=False)
-clf8 = HoeffdingTree(max_byte_size=33554432, memory_estimate_period=1000000, grace_period=200,
+clf6 = HoeffdingTree(max_byte_size=33554432, memory_estimate_period=1000000, grace_period=200,
                       split_criterion='info_gain', split_confidence=1e-07, tie_threshold=0.05,
                        binary_split=False, stop_mem_management=False, remove_poor_atts=False,
                         no_preprune=False, leaf_prediction='nba', nb_threshold=0, nominal_attributes=None)
+clf7 = PassiveAggressiveClassifier(C=1.0, fit_intercept=True, shuffle=False, verbose=0,
+                                    loss='hinge', n_jobs=1, random_state=None, warm_start=False)
+
 '''
     clf9 = GOOWE
 '''
@@ -92,7 +94,7 @@ https://github.com/creme-ml/creme/blob/master/creme/naive_bayes/multinomial.py
 Example in line 26
 clf_text_nb = compose.Pipeline([('tokenize', feature_extraction.CountVectorizer(lowercase=False)), ('nb', naive_bayes.MultinomialNB(alpha=1))])
 '''
-classifiers = [clf1, clf2, clf3, clf4, clf5, clf6, clf7, clf8]
+classifiers = [clf1, clf2, clf3, clf4, clf5, clf6, clf7]
 
 classes_1 = np.array([1, 2, 3, 4, 5, 6, 7])
 classes_2 = np.array([0, 1])
@@ -102,53 +104,46 @@ classes_all = [classes_1, classes_2, classes_3]
 classes_s = classes_all[dataset_index]
 
 classifier_index = int(args["model"]) - 1
-if(classifier_index > 3 and classifier_index < 7):
-    model = compat.convert_sklearn_to_creme(estimator = classifiers[classifier_index], classes = classes_s)
-else:
-    model = classifiers[classifier_index]
+model = classifiers[classifier_index]
 
 metric = Accuracy()
 
-if(classifier_index == 3):
-    s_time = time.time()
-    for (i, (X, y)) in enumerate(dataset):
-        yy = np.array([y]).reshape(1, -1).ravel()
-        xx = np.array([ v for v in X.values() ]).reshape(1, -1)
-        if(i == 0):
-            model.partial_fit(xx, yy, classes = classes_s)
-        else:
-            preds = model.predict(xx)
-            metric = metric.update(y, preds)
-            model.partial_fit(xx, yy, classes = classes_s)
-            elapsed_time = time.time() - s_time
-            print("[INFO] update {} - {} - Elapsed Time: {} seconds".format(i, metric, round(elapsed_time)))
-    e_time = time.time() - s_time
-    print("[INFO] Final - {} - Total Time: {} seconds".format(metric, round(e_time)))
-
-elif(classifier_index == 7):
-    s_time = time.time()
-    for (i, (X, y)) in enumerate(dataset):
-        yy = np.array([y]).reshape(1, -1).ravel()
-        xx = np.array([ v for v in X.values() ]).reshape(1, -1)
-        if(i == 0):
-            model.partial_fit(xx, yy, classes = classes_s)
-        else:
-            preds = model.predict(xx)
-            metric = metric.update(y, preds)
-            model.partial_fit(xx, yy, classes = classes_s)
-            elapsed_time = time.time() - s_time
-            print("[INFO] update {} - {} - Elapsed Time: {} seconds".format(i, metric, round(elapsed_time)))
-    e_time = time.time() - s_time
-    print("[INFO] Final - {} - Total Time: {} seconds".format(metric, round(e_time)))
-
+acc = 0.0
+total = 0.0
+acc_num = 0.0
+s_time = time.time()
+x_list = []
+y_list = []
+counter = 0
+if(classifier_index == 2):
+    f_n_neighbors = 8
 else:
-    s_time = time.time()
-    for (i, (X, y)) in enumerate(dataset):
-        preds = model.predict_one(X)
-        model = model.fit_one(X, y)
-        metric = metric.update(y, preds)
-        elapsed_time = time.time() - s_time
-        print("[INFO] update {} - {} - Elapsed Time: {} seconds".format(i, metric, round(elapsed_time)))
-
-    e_time = time.time() - s_time
-    print("[INFO] Final - {} - Total Time: {} seconds".format(metric, round(e_time)))
+    f_n_neighbors = 1
+for (i, (X, y)) in enumerate(dataset):
+    yy = np.array([y]).reshape(1, -1).ravel()
+    xx = np.array([ v for v in X.values() ]).reshape(1, -1)
+    if(i < f_n_neighbors):
+        model.partial_fit(xx, yy, classes = classes_s)
+    else:
+        if counter < window_size:
+            x_list.append(xx)
+            y_list.append(yy)
+            counter += 1
+        else:
+            x_array = np.asarray(x_list).reshape(window_size, -1)
+            y_array = np.asarray(y_list).reshape(window_size,)
+            preds = model.predict(x_array)
+            acc_num += np.sum(y_array == preds)
+            total = i+1
+            acc = round((acc_num / total) * 100 , 2)
+            model.partial_fit(x_array, y_array, classes = classes_s)
+            elapsed_time = time.time() - s_time
+            x_list = []
+            y_list = []
+            counter = 0
+            memory_usage = process.memory_info().rss * 1e-6
+            print("[INFO] update {} - Accuracy: {} - Elapsed Time: {} seconds - Memory Usage: {} MB".format(i, acc, round(elapsed_time), round(memory_usage, 2)))
+e_time = time.time() - s_time
+memory_usage = process.memory_info().rss * 1e-6
+acc = round((acc_num / total) * 100 , 2)
+print("[INFO] Final update - Accuracy: {} - Total Time: {} seconds - Memory Usage: {} MB".format(acc, round(e_time), round(memory_usage, 2)))
